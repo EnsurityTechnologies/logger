@@ -1,4 +1,4 @@
-package ens_logger
+package logger
 
 import (
 	"io"
