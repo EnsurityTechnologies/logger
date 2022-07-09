@@ -142,7 +142,10 @@ type Logger interface {
 	// Emit a message and key/value pairs at the ERROR level
 	Error(msg string, args ...interface{})
 
-	// Emit a message and key/value pairs at the ERROR level
+	// Emit a message and key/value pairs at the ERROR level & panic
+	Panic(msg string, args ...interface{})
+
+	// If err not null Emit a message and panic
 	ErrorPanic(err error, args ...interface{})
 
 	// Indicate if TRACE logs would be emitted. This and the other Is* guards

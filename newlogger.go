@@ -468,6 +468,12 @@ func (l *newLogger) Error(msg string, args ...interface{}) {
 	l.log(l.Name(), Error, msg, args...)
 }
 
+// Emit a message and key/value pairs at the ERROR level & panic
+func (l *newLogger) Panic(msg string, args ...interface{}) {
+	l.log(l.Name(), Error, msg, args...)
+	panic(msg)
+}
+
 // Emit the message and args & panic
 func (l *newLogger) ErrorPanic(err error, args ...interface{}) {
 	if err != nil {
