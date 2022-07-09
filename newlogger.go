@@ -468,6 +468,14 @@ func (l *newLogger) Error(msg string, args ...interface{}) {
 	l.log(l.Name(), Error, msg, args...)
 }
 
+// Emit the message and args & panic
+func (l *newLogger) ErrorPanic(err error, args ...interface{}) {
+	if err != nil {
+		l.log(l.Name(), Error, err.Error(), args...)
+		panic(err)
+	}
+}
+
 // Indicate that the logger would emit TRACE level logs
 func (l *newLogger) IsTrace() bool {
 	return Level(atomic.LoadInt32(l.level)) == Trace
