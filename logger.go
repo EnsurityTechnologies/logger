@@ -220,7 +220,7 @@ type LoggerOptions struct {
 
 	// Color the output. On Windows, colored logs are only avaiable for io.Writers that
 	// are concretely instances of *os.File.
-	Color ColorOption
+	Color []ColorOption
 
 	// A function which is called with the log information and if it returns true the value
 	// should not be logged.

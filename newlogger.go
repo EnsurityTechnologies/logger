@@ -624,12 +624,10 @@ func (l *newLogger) SetLevel(level Level) {
 
 // checks if the underlying io.Writer is a file, and
 // panics if not. For use by colorization.
-func (l *newLogger) checkWriterIsFile() *os.File {
-	for _, wr := range l.writer.w {
-		fi, ok := wr.(*os.File)
-		if ok {
-			return fi
-		}
+func (l *newLogger) checkWriterIsFile(wr io.Writer) *os.File {
+	fi, ok := wr.(*os.File)
+	if ok {
+		return fi
 	}
 	panic("Cannot enable coloring of non-file Writers")
 }
@@ -653,38 +651,40 @@ func (i *newLogger) Name() string {
 // to approperately configure colorization options. It provides
 // a wrapper to the output stream on Windows systems.
 func (l *newLogger) setColorization(opts *LoggerOptions) {
-	if runtime.GOOS == "windows" {
-		switch opts.Color {
-		case ColorOff:
-			return
-		case ForceColor:
-			fi := l.checkWriterIsFile()
-			l.writer.w = append(l.writer.w, colorable.NewColorable(fi))
-		case AutoColor:
-			fi := l.checkWriterIsFile()
-			isUnixTerm := isatty.IsTerminal(os.Stdout.Fd())
-			isCygwinTerm := isatty.IsCygwinTerminal(os.Stdout.Fd())
-			isTerm := isUnixTerm || isCygwinTerm
-			if !isTerm {
-				l.writer.color = ColorOff
+	for i, w := range l.writer.w {
+		if runtime.GOOS == "windows" {
+			switch opts.Color[i] {
+			case ColorOff:
 				return
+			case ForceColor:
+				fi := l.checkWriterIsFile(w)
+				l.writer.w[i] = colorable.NewColorable(fi)
+			case AutoColor:
+				fi := l.checkWriterIsFile(w)
+				isUnixTerm := isatty.IsTerminal(os.Stdout.Fd())
+				isCygwinTerm := isatty.IsCygwinTerminal(os.Stdout.Fd())
+				isTerm := isUnixTerm || isCygwinTerm
+				if !isTerm {
+					l.writer.color[i] = ColorOff
+				}
+				l.writer.w[i] = colorable.NewColorable(fi)
 			}
-			l.writer.w = append(l.writer.w, colorable.NewColorable(fi))
-		}
-	} else {
-		switch opts.Color {
-		case ColorOff:
-			fallthrough
-		case ForceColor:
-			return
-		case AutoColor:
-			fi := l.checkWriterIsFile()
-			isUnixTerm := isatty.IsTerminal(fi.Fd())
-			isCygwinTerm := isatty.IsCygwinTerminal(fi.Fd())
-			isTerm := isUnixTerm || isCygwinTerm
-			if !isTerm {
-				l.writer.color = ColorOff
+		} else {
+			switch opts.Color[i] {
+			case ColorOff:
+				fallthrough
+			case ForceColor:
+				return
+			case AutoColor:
+				fi := l.checkWriterIsFile(w)
+				isUnixTerm := isatty.IsTerminal(fi.Fd())
+				isCygwinTerm := isatty.IsCygwinTerminal(fi.Fd())
+				isTerm := isUnixTerm || isCygwinTerm
+				if !isTerm {
+					l.writer.color[i] = ColorOff
+				}
 			}
 		}
 	}
+
 }

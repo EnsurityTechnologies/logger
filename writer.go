@@ -8,25 +8,32 @@ import (
 type writer struct {
 	b     bytes.Buffer
 	w     []io.Writer
-	color ColorOption
+	color []ColorOption
 }
 
-func newWriter(w []io.Writer, color ColorOption) *writer {
+func newWriter(w []io.Writer, color []ColorOption) *writer {
 	return &writer{w: w, color: color}
 }
 
 func (w *writer) Flush(level Level) (err error) {
 	var unwritten = w.b.Bytes()
 
-	if w.color != ColorOff {
-		color := _levelToColor[level]
-		unwritten = []byte(color.Sprintf("%s", unwritten))
-	}
-	for _, wr := range w.w {
+	for i, wr := range w.w {
 		if lw, ok := wr.(LevelWriter); ok {
 			_, err = lw.LevelWrite(level, unwritten)
 		} else {
-			_, err = wr.Write(unwritten)
+			l := len(unwritten)
+			if unwritten[0] == 27 {
+				unwritten = unwritten[5 : l-4]
+			}
+			if w.color[i] != ColorOff {
+				color := _levelToColor[level]
+				colorbytes := []byte(color.Sprintf("%s", unwritten))
+				_, err = wr.Write(colorbytes)
+			} else {
+				_, err = wr.Write(unwritten)
+			}
+
 		}
 	}
 

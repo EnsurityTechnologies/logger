@@ -14,8 +14,8 @@ func TestLogger(t *testing.T) {
 	}
 	l := New(&LoggerOptions{
 		Level:  Debug,
-		Color:  AutoColor,
-		Output: []io.Writer{fp, DefaultOutput},
+		Color:  []ColorOption{AutoColor, ColorOff},
+		Output: []io.Writer{DefaultOutput, fp},
 	})
 	l.Debug("Test")
 	l.Info("Test")
