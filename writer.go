@@ -7,11 +7,11 @@ import (
 
 type writer struct {
 	b     bytes.Buffer
-	w     io.Writer
+	w     []io.Writer
 	color ColorOption
 }
 
-func newWriter(w io.Writer, color ColorOption) *writer {
+func newWriter(w []io.Writer, color ColorOption) *writer {
 	return &writer{w: w, color: color}
 }
 
@@ -22,12 +22,14 @@ func (w *writer) Flush(level Level) (err error) {
 		color := _levelToColor[level]
 		unwritten = []byte(color.Sprintf("%s", unwritten))
 	}
-
-	if lw, ok := w.w.(LevelWriter); ok {
-		_, err = lw.LevelWrite(level, unwritten)
-	} else {
-		_, err = w.w.Write(unwritten)
+	for _, wr := range w.w {
+		if lw, ok := wr.(LevelWriter); ok {
+			_, err = lw.LevelWrite(level, unwritten)
+		} else {
+			_, err = wr.Write(unwritten)
+		}
 	}
+
 	w.b.Reset()
 	return err
 }

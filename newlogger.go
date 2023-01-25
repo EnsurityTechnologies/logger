@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"regexp"
@@ -80,7 +81,7 @@ func New(opts *LoggerOptions) Logger {
 
 	output := opts.Output
 	if output == nil {
-		output = DefaultOutput
+		output = []io.Writer{DefaultOutput}
 	}
 
 	level := opts.Level
@@ -98,8 +99,8 @@ func New(opts *LoggerOptions) Logger {
 		caller:     opts.IncludeLocation,
 		name:       opts.Name,
 		timeFormat: TimeFormat,
-		mutex:      mutex,
 		writer:     newWriter(output, opts.Color),
+		mutex:      mutex,
 		level:      new(int32),
 		exclude:    opts.Exclude,
 	}
@@ -624,11 +625,13 @@ func (l *newLogger) SetLevel(level Level) {
 // checks if the underlying io.Writer is a file, and
 // panics if not. For use by colorization.
 func (l *newLogger) checkWriterIsFile() *os.File {
-	fi, ok := l.writer.w.(*os.File)
-	if !ok {
-		panic("Cannot enable coloring of non-file Writers")
+	for _, wr := range l.writer.w {
+		fi, ok := wr.(*os.File)
+		if ok {
+			return fi
+		}
 	}
-	return fi
+	panic("Cannot enable coloring of non-file Writers")
 }
 
 // Accept implements the SinkAdapter interface
@@ -656,7 +659,7 @@ func (l *newLogger) setColorization(opts *LoggerOptions) {
 			return
 		case ForceColor:
 			fi := l.checkWriterIsFile()
-			l.writer.w = colorable.NewColorable(fi)
+			l.writer.w = append(l.writer.w, colorable.NewColorable(fi))
 		case AutoColor:
 			fi := l.checkWriterIsFile()
 			isUnixTerm := isatty.IsTerminal(os.Stdout.Fd())
@@ -666,7 +669,7 @@ func (l *newLogger) setColorization(opts *LoggerOptions) {
 				l.writer.color = ColorOff
 				return
 			}
-			l.writer.w = colorable.NewColorable(fi)
+			l.writer.w = append(l.writer.w, colorable.NewColorable(fi))
 		}
 	} else {
 		switch opts.Color {

@@ -198,7 +198,7 @@ type LoggerOptions struct {
 	Level Level
 
 	// Where to write the logs to. Defaults to os.Stderr if nil
-	Output io.Writer
+	Output []io.Writer
 
 	// An optional Locker in case Output is shared. This can be a sync.Mutex or
 	// a NoopLocker if the caller wants control over output, e.g. for batching
