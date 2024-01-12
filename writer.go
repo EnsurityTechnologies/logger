@@ -15,6 +15,22 @@ func newWriter(w []io.Writer, color []ColorOption) *writer {
 	return &writer{w: w, color: color}
 }
 
+func (w *writer) UpdateWriter(nw io.Writer) {
+	tw := make([]io.Writer, 0)
+	color := make([]ColorOption, 0)
+	for i, wr := range w.w {
+		_, ok := wr.(*fileWrite)
+		if !ok {
+			tw = append(tw, wr)
+			color = append(color, w.color[i])
+		}
+	}
+	tw = append(tw, nw)
+	color = append(color, ColorOff)
+	w.w = tw
+	w.color = color
+}
+
 func (w *writer) Flush(level Level) (err error) {
 	var unwritten = w.b.Bytes()
 

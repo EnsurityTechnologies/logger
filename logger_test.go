@@ -20,3 +20,10 @@ func TestLogger(t *testing.T) {
 	l.Debug("Test")
 	l.Info("Test")
 }
+
+func TestDefaultLog(t *testing.T) {
+	l := NewDefaultLog(nil, "test", Debug, "./")
+	l.Debug("Test")
+	l.Info("Test")
+	l.Close()
+}

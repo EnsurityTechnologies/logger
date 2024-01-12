@@ -2,6 +2,7 @@ package logger
 
 import (
 	"bytes"
+	"context"
 	"encoding"
 	"encoding/json"
 	"errors"
@@ -60,6 +61,9 @@ type newLogger struct {
 	caller     bool
 	name       string
 	timeFormat string
+	dir        string
+	fw         *fileWrite
+	ctx        context.Context
 
 	// This is an interface so that it's shared by any derived loggers, since
 	// those derived loggers share the bufio.Writer as well.
@@ -94,6 +98,14 @@ func New(opts *LoggerOptions) Logger {
 		mutex = new(sync.Mutex)
 	}
 
+	if opts.DailyLogDir == "" {
+		opts.DailyLogDir = "./"
+	}
+
+	if opts.ctx == nil {
+		opts.ctx = context.Background()
+	}
+
 	l := &newLogger{
 		json:       opts.JSONFormat,
 		caller:     opts.IncludeLocation,
@@ -101,11 +113,18 @@ func New(opts *LoggerOptions) Logger {
 		timeFormat: TimeFormat,
 		writer:     newWriter(output, opts.Color),
 		mutex:      mutex,
+		dir:        opts.DailyLogDir,
+		ctx:        opts.ctx,
 		level:      new(int32),
 		exclude:    opts.Exclude,
 	}
 
 	l.setColorization(opts)
+
+	if opts.EnableDailyLog {
+		l.createDailyLog()
+		go l.dailyThread()
+	}
 
 	if opts.DisableTime {
 		l.timeFormat = ""
@@ -116,6 +135,55 @@ func New(opts *LoggerOptions) Logger {
 	atomic.StoreInt32(l.level, int32(level))
 
 	return l
+}
+
+func (l *newLogger) dailyThread() {
+	for {
+		now := time.Now()
+		nextDay := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
+		dur := nextDay.Sub(now)
+		ticker := time.NewTicker(dur)
+		select {
+		case <-l.ctx.Done():
+			return
+		case <-ticker.C:
+			l.createDailyLog()
+		}
+	}
+}
+
+func (l *newLogger) createDailyLog() bool {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	if l.fw != nil {
+		l.fw.Close()
+	}
+	var err error
+	t := time.Now()
+	fn := l.dir + fmt.Sprintf("%02d-%02d-%04d", t.Day(), t.Month(), t.Year()) + ".log"
+	l.fw, err = newFileWrite(fn)
+	if err != nil {
+		return false
+	}
+	l.writer.UpdateWriter(l.fw)
+	return true
+}
+
+func NewDefaultLog(ctx context.Context, name string, level Level, dir string) Logger {
+	opt := &LoggerOptions{
+		Name:  name,
+		Level: level,
+		Output: []io.Writer{
+			DefaultOutput,
+		},
+		Color: []ColorOption{
+			AutoColor,
+		},
+		EnableDailyLog: true,
+		DailyLogDir:    dir,
+		ctx:            ctx,
+	}
+	return New(opt)
 }
 
 // Log a message and a set of key/value pairs if the given level is at
@@ -506,6 +574,10 @@ func (l *newLogger) IsWarn() bool {
 // Indicate that the logger would emit ERROR level logs
 func (l *newLogger) IsError() bool {
 	return Level(atomic.LoadInt32(l.level)) <= Error
+}
+
+func (l *newLogger) Close() {
+	l.ctx.Done()
 }
 
 // Return a sub-Logger for which every emitted log message will contain

@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"context"
 	"io"
 	"os"
 	"strings"
@@ -187,6 +188,8 @@ type Logger interface {
 	// Updates the level. This should affect all sub-loggers as well. If an
 	// implementation cannot update the level on the fly, it should no-op.
 	SetLevel(level Level)
+
+	Close()
 }
 
 // LoggerOptions can be used to configure a new logger.
@@ -217,6 +220,12 @@ type LoggerOptions struct {
 	// Control whether or not to display the time at all. This is required
 	// because setting TimeFormat to empty assumes the default format.
 	DisableTime bool
+
+	EnableDailyLog bool
+
+	DailyLogDir string
+
+	ctx context.Context
 
 	// Color the output. On Windows, colored logs are only avaiable for io.Writers that
 	// are concretely instances of *os.File.
