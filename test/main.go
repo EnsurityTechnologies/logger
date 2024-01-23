@@ -10,6 +10,8 @@ import (
 func main() {
 	fp, err := os.OpenFile("log.txt",
 		os.O_APPEND|os.O_CREATE, 0644)
+		
+		
 	if err != nil {
 		panic(err)
 	}
