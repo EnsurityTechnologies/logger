@@ -2,6 +2,7 @@ package logger
 
 import (
 	"bytes"
+	"context"
 	"encoding"
 	"encoding/json"
 	"errors"
@@ -23,11 +24,8 @@ import (
 	isatty "github.com/mattn/go-isatty"
 )
 
-// TimeFormat to use for logging. This is a version of RFC3339 that contains
-// contains millisecond precision
 const TimeFormat = "2006-01-02T15:04:05.000Z0700"
 
-// errJsonUnsupportedTypeMsg is included in log json entries, if an arg cannot be serialized to json
 const errJsonUnsupportedTypeMsg = "logging contained values that don't serialize to json"
 
 const MissingKey = "EXTRA_VALUE_AT_END"
@@ -50,29 +48,26 @@ var (
 	}
 )
 
-// Make sure that newLogger is a Logger
 var _ Logger = &newLogger{}
 
-// newLogger is an internal logger implementation. Internal in that it is
-// defined entirely by this package.
 type newLogger struct {
 	json       bool
 	caller     bool
 	name       string
 	timeFormat string
-
-	// This is an interface so that it's shared by any derived loggers, since
-	// those derived loggers share the bufio.Writer as well.
-	mutex  Locker
-	writer *writer
-	level  *int32
+	dir        string
+	fw         *fileWrite
+	ctx        context.Context
+	today      time.Time
+	mutex      Locker
+	writer     *writer
+	level      *int32
 
 	implied []interface{}
 
 	exclude func(level Level, msg string, args ...interface{}) bool
 }
 
-// New returns a configured logger.
 func New(opts *LoggerOptions) Logger {
 
 	if opts == nil {
@@ -94,6 +89,14 @@ func New(opts *LoggerOptions) Logger {
 		mutex = new(sync.Mutex)
 	}
 
+	if opts.DailyLogDir == "" {
+		opts.DailyLogDir = "./"
+	}
+
+	if opts.ctx == nil {
+		opts.ctx = context.Background()
+	}
+
 	l := &newLogger{
 		json:       opts.JSONFormat,
 		caller:     opts.IncludeLocation,
@@ -101,11 +104,17 @@ func New(opts *LoggerOptions) Logger {
 		timeFormat: TimeFormat,
 		writer:     newWriter(output, opts.Color),
 		mutex:      mutex,
+		dir:        opts.DailyLogDir,
+		ctx:        opts.ctx,
 		level:      new(int32),
 		exclude:    opts.Exclude,
 	}
 
 	l.setColorization(opts)
+
+	if opts.EnableDailyLog {
+		l.createDailyLog()
+	}
 
 	if opts.DisableTime {
 		l.timeFormat = ""
@@ -118,14 +127,50 @@ func New(opts *LoggerOptions) Logger {
 	return l
 }
 
-// Log a message and a set of key/value pairs if the given level is at
-// or more severe that the threshold configured in the Logger.
+func (l *newLogger) createDailyLog() bool {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	if l.fw != nil {
+		l.fw.Close()
+	}
+	var err error
+	t := time.Now()
+	fn := l.dir + fmt.Sprintf("%02d-%02d-%04d", t.Day(), t.Month(), t.Year()) + ".log"
+	l.fw, err = newFileWrite(fn)
+	if err != nil {
+		return false
+	}
+	l.today = t
+	l.writer.UpdateWriter(l.fw)
+	return true
+}
+
+func NewDefaultLog(ctx context.Context, name string, level Level, dir string) Logger {
+	opt := &LoggerOptions{
+		Name:  name,
+		Level: level,
+		Output: []io.Writer{
+			DefaultOutput,
+		},
+		Color: []ColorOption{
+			AutoColor,
+		},
+		EnableDailyLog: true,
+		DailyLogDir:    dir,
+		ctx:            ctx,
+	}
+	return New(opt)
+}
 func (l *newLogger) log(name string, level Level, msg string, args ...interface{}) {
 	if level < Level(atomic.LoadInt32(l.level)) {
 		return
 	}
 
 	t := time.Now()
+
+	if l.today.Day() != t.Day() {
+		l.createDailyLog()
+	}
 
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
@@ -139,27 +184,13 @@ func (l *newLogger) log(name string, level Level, msg string, args ...interface{
 	l.writer.Flush(level)
 }
 
-// Cleanup a path by returning the last 2 segments of the path only.
 func trimCallerPath(path string) string {
-	// lovely borrowed from zap
-	// nb. To make sure we trim the path correctly on Windows too, we
-	// counter-intuitively need to use '/' and *not* os.PathSeparator here,
-	// because the path given originates from Go stdlib, specifically
-	// runtime.Caller() which (as of Mar/17) returns forward slashes even on
-	// Windows.
-	//
-	// See https://github.com/golang/go/issues/3335
-	// and https://github.com/golang/go/issues/18151
-	//
-	// for discussion on the issue on Go side.
 
-	// Find the last separator.
 	idx := strings.LastIndexByte(path, '/')
 	if idx == -1 {
 		return path
 	}
 
-	// Find the penultimate separator.
 	idx = strings.LastIndexByte(path[:idx], '/')
 	if idx == -1 {
 		return path
@@ -170,7 +201,6 @@ func trimCallerPath(path string) string {
 
 var logImplFile = regexp.MustCompile(`.+newLogger.go|.+interceptlogger.go$`)
 
-// Non-JSON logging format function
 func (l *newLogger) logPlain(t time.Time, name string, level Level, msg string, args ...interface{}) {
 	if len(l.timeFormat) > 0 {
 		l.writer.WriteString(t.Format(l.timeFormat))
@@ -186,8 +216,6 @@ func (l *newLogger) logPlain(t time.Time, name string, level Level, msg string, 
 
 	offset := 3
 	if l.caller {
-		// Check if the caller is inside our package and inside
-		// a logger implementation file
 		if _, file, _, ok := runtime.Caller(3); ok {
 			match := logImplFile.MatchString(file)
 			if match {
@@ -347,7 +375,6 @@ func (l *newLogger) renderSlice(v reflect.Value) string {
 	return buf.String()
 }
 
-// JSON logging function
 func (l *newLogger) logJSON(t time.Time, name string, level Level, msg string, args ...interface{}) {
 	vals := l.jsonMapEntry(t, name, level, msg)
 	args = append(l.implied, args...)
@@ -368,9 +395,6 @@ func (l *newLogger) logJSON(t time.Time, name string, level Level, msg string, a
 			val := args[i+1]
 			switch sv := val.(type) {
 			case error:
-				// Check if val is of type error. If error type doesn't
-				// implement json.Marshaler or encoding.TextMarshaler
-				// then set val to err.Error() so that it gets marshaled
 				switch sv.(type) {
 				case json.Marshaler, encoding.TextMarshaler:
 				default:
@@ -439,43 +463,35 @@ func (l newLogger) jsonMapEntry(t time.Time, name string, level Level, msg strin
 	return vals
 }
 
-// Emit the message and args at the provided level
 func (l *newLogger) Log(level Level, msg string, args ...interface{}) {
 	l.log(l.Name(), level, msg, args...)
 }
 
-// Emit the message and args at DEBUG level
 func (l *newLogger) Debug(msg string, args ...interface{}) {
 	l.log(l.Name(), Debug, msg, args...)
 }
 
-// Emit the message and args at TRACE level
 func (l *newLogger) Trace(msg string, args ...interface{}) {
 	l.log(l.Name(), Trace, msg, args...)
 }
 
-// Emit the message and args at INFO level
 func (l *newLogger) Info(msg string, args ...interface{}) {
 	l.log(l.Name(), Info, msg, args...)
 }
 
-// Emit the message and args at WARN level
 func (l *newLogger) Warn(msg string, args ...interface{}) {
 	l.log(l.Name(), Warn, msg, args...)
 }
 
-// Emit the message and args at ERROR level
 func (l *newLogger) Error(msg string, args ...interface{}) {
 	l.log(l.Name(), Error, msg, args...)
 }
 
-// Emit a message and key/value pairs at the ERROR level & panic
 func (l *newLogger) Panic(msg string, args ...interface{}) {
 	l.log(l.Name(), Error, msg, args...)
 	panic(msg)
 }
 
-// Emit the message and args & panic
 func (l *newLogger) ErrorPanic(err error, args ...interface{}) {
 	if err != nil {
 		l.log(l.Name(), Error, err.Error(), args...)
@@ -483,34 +499,30 @@ func (l *newLogger) ErrorPanic(err error, args ...interface{}) {
 	}
 }
 
-// Indicate that the logger would emit TRACE level logs
 func (l *newLogger) IsTrace() bool {
 	return Level(atomic.LoadInt32(l.level)) == Trace
 }
 
-// Indicate that the logger would emit DEBUG level logs
 func (l *newLogger) IsDebug() bool {
 	return Level(atomic.LoadInt32(l.level)) <= Debug
 }
 
-// Indicate that the logger would emit INFO level logs
 func (l *newLogger) IsInfo() bool {
 	return Level(atomic.LoadInt32(l.level)) <= Info
 }
 
-// Indicate that the logger would emit WARN level logs
 func (l *newLogger) IsWarn() bool {
 	return Level(atomic.LoadInt32(l.level)) <= Warn
 }
 
-// Indicate that the logger would emit ERROR level logs
 func (l *newLogger) IsError() bool {
 	return Level(atomic.LoadInt32(l.level)) <= Error
 }
 
-// Return a sub-Logger for which every emitted log message will contain
-// the given key/value pairs. This is used to create a context specific
-// Logger.
+func (l *newLogger) Close() {
+	l.ctx.Done()
+}
+
 func (l *newLogger) With(args ...interface{}) Logger {
 	var extra interface{}
 
@@ -524,13 +536,11 @@ func (l *newLogger) With(args ...interface{}) Logger {
 	result := make(map[string]interface{}, len(l.implied)+len(args))
 	keys := make([]string, 0, len(l.implied)+len(args))
 
-	// Read existing args, store map and key for consistent sorting
 	for i := 0; i < len(l.implied); i += 2 {
 		key := l.implied[i].(string)
 		keys = append(keys, key)
 		result[key] = l.implied[i+1]
 	}
-	// Read new args, store map and key for consistent sorting
 	for i := 0; i < len(args); i += 2 {
 		key := args[i].(string)
 		_, exists := result[key]
@@ -540,7 +550,6 @@ func (l *newLogger) With(args ...interface{}) Logger {
 		result[key] = args[i+1]
 	}
 
-	// Sort keys to be consistent
 	sort.Strings(keys)
 
 	sl.implied = make([]interface{}, 0, len(l.implied)+len(args))
@@ -556,8 +565,6 @@ func (l *newLogger) With(args ...interface{}) Logger {
 	return &sl
 }
 
-// Create a new sub-Logger that a name decending from the current name.
-// This is used to create a subsystem specific Logger.
 func (l *newLogger) Named(name string) Logger {
 	sl := *l
 
@@ -570,9 +577,6 @@ func (l *newLogger) Named(name string) Logger {
 	return &sl
 }
 
-// Create a new sub-Logger with an explicit name. This ignores the current
-// name. This is used to create a standalone logger that doesn't fall
-// within the normal hierarchy.
 func (l *newLogger) ResetNamed(name string) Logger {
 	sl := *l
 
@@ -616,14 +620,10 @@ func (l *newLogger) resetOutput(opts *LoggerOptions) error {
 	return nil
 }
 
-// Update the logging level on-the-fly. This will affect all subloggers as
-// well.
 func (l *newLogger) SetLevel(level Level) {
 	atomic.StoreInt32(l.level, int32(level))
 }
 
-// checks if the underlying io.Writer is a file, and
-// panics if not. For use by colorization.
 func (l *newLogger) checkWriterIsFile(wr io.Writer) *os.File {
 	fi, ok := wr.(*os.File)
 	if ok {
@@ -632,24 +632,18 @@ func (l *newLogger) checkWriterIsFile(wr io.Writer) *os.File {
 	panic("Cannot enable coloring of non-file Writers")
 }
 
-// Accept implements the SinkAdapter interface
 func (i *newLogger) Accept(name string, level Level, msg string, args ...interface{}) {
 	i.log(name, level, msg, args...)
 }
 
-// ImpliedArgs returns the loggers implied args
 func (i *newLogger) ImpliedArgs() []interface{} {
 	return i.implied
 }
 
-// Name returns the loggers name
 func (i *newLogger) Name() string {
 	return i.name
 }
 
-// setColorization will mutate the values of this logger
-// to approperately configure colorization options. It provides
-// a wrapper to the output stream on Windows systems.
 func (l *newLogger) setColorization(opts *LoggerOptions) {
 	for i, w := range l.writer.w {
 		if runtime.GOOS == "windows" {

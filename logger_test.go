@@ -4,8 +4,8 @@ import (
 	"io"
 	"os"
 	"testing"
+	"time"
 )
-
 func TestLogger(t *testing.T) {
 	fp, err := os.OpenFile("log.txt",
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -20,3 +20,18 @@ func TestLogger(t *testing.T) {
 	l.Debug("Test")
 	l.Info("Test")
 }
+
+func TestDefaultLog(t *testing.T) {
+	
+	l := NewDefaultLog(nil , "test", Debug, "./")
+	for {
+		l.Info("Test message")
+		time.Sleep(1 *time.Minute)
+	}
+	
+	}
+	
+
+
+	
+	                                     

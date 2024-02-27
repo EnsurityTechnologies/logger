@@ -15,6 +15,22 @@ func newWriter(w []io.Writer, color []ColorOption) *writer {
 	return &writer{w: w, color: color}
 }
 
+func (w *writer) UpdateWriter(nw io.Writer) {
+	tw := make([]io.Writer, 0)
+	color := make([]ColorOption, 0)
+	for i, wr := range w.w {
+		_, ok := wr.(*fileWrite)
+		if !ok {
+			tw = append(tw, wr)
+			color = append(color, w.color[i])
+		}
+	}
+	tw = append(tw, nw)
+	color = append(color, ColorOff)
+	w.w = tw
+	w.color = color
+}
+
 func (w *writer) Flush(level Level) (err error) {
 	var unwritten = w.b.Bytes()
 
@@ -53,22 +69,15 @@ func (w *writer) WriteString(s string) (int, error) {
 	return w.b.WriteString(s)
 }
 
-// LevelWriter is the interface that wraps the LevelWrite method.
 type LevelWriter interface {
 	LevelWrite(level Level, p []byte) (n int, err error)
 }
 
-// LeveledWriter writes all log messages to the standard writer,
-// except for log levels that are defined in the overrides map.
 type LeveledWriter struct {
 	standard  io.Writer
 	overrides map[Level]io.Writer
 }
 
-// NewLeveledWriter returns an initialized LeveledWriter.
-//
-// standard will be used as the default writer for all log levels,
-// except for log levels that are defined in the overrides map.
 func NewLeveledWriter(standard io.Writer, overrides map[Level]io.Writer) *LeveledWriter {
 	return &LeveledWriter{
 		standard:  standard,
@@ -76,12 +85,10 @@ func NewLeveledWriter(standard io.Writer, overrides map[Level]io.Writer) *Levele
 	}
 }
 
-// Write implements io.Writer.
 func (lw *LeveledWriter) Write(p []byte) (int, error) {
 	return lw.standard.Write(p)
 }
 
-// LevelWrite implements LevelWriter.
 func (lw *LeveledWriter) LevelWrite(level Level, p []byte) (int, error) {
 	w, ok := lw.overrides[level]
 	if !ok {
