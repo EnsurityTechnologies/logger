@@ -58,10 +58,10 @@ type newLogger struct {
 	dir        string
 	fw         *fileWrite
 	ctx        context.Context
-
-	mutex  Locker
-	writer *writer
-	level  *int32
+	today      time.Time
+	mutex      Locker
+	writer     *writer
+	level      *int32
 
 	implied []interface{}
 
@@ -114,7 +114,6 @@ func New(opts *LoggerOptions) Logger {
 
 	if opts.EnableDailyLog {
 		l.createDailyLog()
-		go l.dailyThread()
 	}
 
 	if opts.DisableTime {
@@ -126,21 +125,6 @@ func New(opts *LoggerOptions) Logger {
 	atomic.StoreInt32(l.level, int32(level))
 
 	return l
-}
-
-func (l *newLogger) dailyThread() {
-	for {
-		now := time.Now()
-		nextDay := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
-		dur := nextDay.Sub(now)
-		ticker := time.NewTicker(dur)
-		select {
-		case <-l.ctx.Done():
-			return
-		case <-ticker.C:
-			l.createDailyLog()
-		}
-	}
 }
 
 func (l *newLogger) createDailyLog() bool {
@@ -156,6 +140,7 @@ func (l *newLogger) createDailyLog() bool {
 	if err != nil {
 		return false
 	}
+	l.today = t
 	l.writer.UpdateWriter(l.fw)
 	return true
 }
@@ -182,6 +167,10 @@ func (l *newLogger) log(name string, level Level, msg string, args ...interface{
 	}
 
 	t := time.Now()
+
+	if l.today.Day() != t.Day() {
+		l.createDailyLog()
+	}
 
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
