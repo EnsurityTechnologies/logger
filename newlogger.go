@@ -51,17 +51,18 @@ var (
 var _ Logger = &newLogger{}
 
 type newLogger struct {
-	json       bool
-	caller     bool
-	name       string
-	timeFormat string
-	dir        string
-	fw         *fileWrite
-	ctx        context.Context
-	today      time.Time
-	mutex      Locker
-	writer     *writer
-	level      *int32
+	json           bool
+	caller         bool
+	name           string
+	timeFormat     string
+	dir            string
+	fw             *fileWrite
+	ctx            context.Context
+	today          time.Time
+	mutex          Locker
+	writer         *writer
+	level          *int32
+	enableDailyLog bool
 
 	implied []interface{}
 
@@ -113,6 +114,7 @@ func New(opts *LoggerOptions) Logger {
 	l.setColorization(opts)
 
 	if opts.EnableDailyLog {
+		l.enableDailyLog = true
 		l.createDailyLog()
 	}
 
@@ -167,11 +169,11 @@ func (l *newLogger) log(name string, level Level, msg string, args ...interface{
 	}
 
 	t := time.Now()
-
-	if l.today.Day() != t.Day() {
-		l.createDailyLog()
+	if l.enableDailyLog {
+		if l.today.Day() != t.Day() {
+			l.createDailyLog()
+		}
 	}
-
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
