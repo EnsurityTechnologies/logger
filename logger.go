@@ -8,9 +8,8 @@ import (
 )
 
 var (
-
 	DefaultOutput io.Writer = os.Stderr
-	DefaultLevel = Info
+	DefaultLevel            = Info
 )
 
 type Format []interface{}
@@ -28,7 +27,6 @@ type Binary int
 type Level int32
 
 const (
-	
 	NoLevel Level = 0
 
 	Trace Level = 1
@@ -45,11 +43,11 @@ const (
 type ColorOption uint8
 
 const (
-	
 	ColorOff ColorOption = iota
 	AutoColor
 	ForceColor
 )
+
 func LevelFromString(levelStr string) Level {
 	levelStr = strings.ToLower(strings.TrimSpace(levelStr))
 	switch levelStr {
@@ -86,8 +84,8 @@ func (l Level) String() string {
 		return "unknown"
 	}
 }
-type Logger interface {
 
+type Logger interface {
 	Log(level Level, msg string, args ...interface{})
 
 	Trace(msg string, args ...interface{})
@@ -119,7 +117,6 @@ type Logger interface {
 
 	Name() string
 
-
 	Named(name string) Logger
 
 	ResetNamed(name string) Logger
@@ -136,7 +133,6 @@ type LoggerOptions struct {
 
 	Output []io.Writer
 
-	
 	Mutex Locker
 
 	JSONFormat bool
@@ -150,6 +146,8 @@ type LoggerOptions struct {
 	EnableDailyLog bool
 
 	DailyLogDir string
+
+	KeepNumDays int
 
 	ctx context.Context
 

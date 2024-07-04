@@ -63,8 +63,8 @@ type newLogger struct {
 	writer         *writer
 	level          *int32
 	enableDailyLog bool
-
-	implied []interface{}
+	keepNumDays    int
+	implied        []interface{}
 
 	exclude func(level Level, msg string, args ...interface{}) bool
 }
@@ -99,16 +99,17 @@ func New(opts *LoggerOptions) Logger {
 	}
 
 	l := &newLogger{
-		json:       opts.JSONFormat,
-		caller:     opts.IncludeLocation,
-		name:       opts.Name,
-		timeFormat: TimeFormat,
-		writer:     newWriter(output, opts.Color),
-		mutex:      mutex,
-		dir:        opts.DailyLogDir,
-		ctx:        opts.ctx,
-		level:      new(int32),
-		exclude:    opts.Exclude,
+		json:        opts.JSONFormat,
+		caller:      opts.IncludeLocation,
+		name:        opts.Name,
+		timeFormat:  TimeFormat,
+		writer:      newWriter(output, opts.Color),
+		mutex:       mutex,
+		dir:         opts.DailyLogDir,
+		keepNumDays: opts.KeepNumDays,
+		ctx:         opts.ctx,
+		level:       new(int32),
+		exclude:     opts.Exclude,
 	}
 
 	l.setColorization(opts)
@@ -137,6 +138,14 @@ func (l *newLogger) createDailyLog() bool {
 	}
 	var err error
 	t := time.Now()
+	if l.keepNumDays > 0 {
+		then := t.AddDate(0, 0, (l.keepNumDays+1)*(-1))
+		fn := l.dir + fmt.Sprintf("%02d-%02d-%04d", then.Day(), then.Month(), then.Year()) + ".log"
+		_, err := os.Stat(fn)
+		if err == nil {
+			os.Remove(fn)
+		}
+	}
 	fn := l.dir + fmt.Sprintf("%02d-%02d-%04d", t.Day(), t.Month(), t.Year()) + ".log"
 	l.fw, err = newFileWrite(fn)
 	if err != nil {
@@ -147,7 +156,7 @@ func (l *newLogger) createDailyLog() bool {
 	return true
 }
 
-func NewDefaultLog(ctx context.Context, name string, level Level, dir string) Logger {
+func NewDefaultLog(ctx context.Context, name string, level Level, dir string, keepNumDays int) Logger {
 	opt := &LoggerOptions{
 		Name:  name,
 		Level: level,
@@ -159,6 +168,7 @@ func NewDefaultLog(ctx context.Context, name string, level Level, dir string) Lo
 		},
 		EnableDailyLog: true,
 		DailyLogDir:    dir,
+		KeepNumDays:    keepNumDays,
 		ctx:            ctx,
 	}
 	return New(opt)
