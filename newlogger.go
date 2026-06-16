@@ -499,6 +499,11 @@ func (l *newLogger) Error(msg string, args ...interface{}) {
 	l.log(l.Name(), Error, msg, args...)
 }
 
+func (l *newLogger) LogError(msg string, args ...interface{}) error {
+	l.log(l.Name(), Error, msg, args...)
+	return fmt.Errorf(msg)
+}
+
 func (l *newLogger) Panic(msg string, args ...interface{}) {
 	l.log(l.Name(), Error, msg, args...)
 	panic(msg)

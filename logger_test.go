@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -30,4 +31,11 @@ func TestDefaultLog(t *testing.T) {
 		time.Sleep(1 * time.Minute)
 	}
 
+}
+
+func TestEventLog(t *testing.T) {
+	OnError(nil).Error("Error not occured")
+	OnError(nil).Fatal("Error not occured")
+	OnError(fmt.Errorf("testing error")).Error("Error occured")
+	WithFields("test", 10).Info("testing with fileds")
 }

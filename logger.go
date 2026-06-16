@@ -14,6 +14,8 @@ var (
 
 type Format []interface{}
 
+type Fields map[string]interface{}
+
 func Fmt(str string, args ...interface{}) Format {
 	return append(Format{str}, args...)
 }
@@ -97,6 +99,8 @@ type Logger interface {
 	Warn(msg string, args ...interface{})
 
 	Error(msg string, args ...interface{})
+
+	LogError(msg string, args ...interface{}) error
 
 	Panic(msg string, args ...interface{})
 
