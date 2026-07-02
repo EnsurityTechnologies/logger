@@ -9,7 +9,7 @@ import (
 
 var (
 	DefaultOutput io.Writer = os.Stderr
-	DefaultLevel            = Info
+	DefaultLevel            = InfoLevel
 )
 
 type Format []interface{}
@@ -31,15 +31,15 @@ type Level int32
 const (
 	NoLevel Level = 0
 
-	Trace Level = 1
+	TraceLevel Level = 1
 
-	Debug Level = 2
+	DebugLevel Level = 2
 
-	Info Level = 3
+	InfoLevel Level = 3
 
-	Warn Level = 4
+	WarnLevel Level = 4
 
-	Error Level = 5
+	ErrorLevel Level = 5
 )
 
 type ColorOption uint8
@@ -54,15 +54,15 @@ func LevelFromString(levelStr string) Level {
 	levelStr = strings.ToLower(strings.TrimSpace(levelStr))
 	switch levelStr {
 	case "trace":
-		return Trace
+		return TraceLevel
 	case "debug":
-		return Debug
+		return DebugLevel
 	case "info":
-		return Info
+		return InfoLevel
 	case "warn":
-		return Warn
+		return WarnLevel
 	case "error":
-		return Error
+		return ErrorLevel
 	default:
 		return NoLevel
 	}
@@ -70,15 +70,15 @@ func LevelFromString(levelStr string) Level {
 
 func (l Level) String() string {
 	switch l {
-	case Trace:
+	case TraceLevel:
 		return "trace"
-	case Debug:
+	case DebugLevel:
 		return "debug"
-	case Info:
+	case InfoLevel:
 		return "info"
-	case Warn:
+	case WarnLevel:
 		return "warn"
-	case Error:
+	case ErrorLevel:
 		return "error"
 	case NoLevel:
 		return "none"

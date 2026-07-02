@@ -32,19 +32,19 @@ const MissingKey = "EXTRA_VALUE_AT_END"
 
 var (
 	_levelToBracket = map[Level]string{
-		Debug: "[DEBUG]",
-		Trace: "[TRACE]",
-		Info:  "[INFO] ",
-		Warn:  "[WARN] ",
-		Error: "[ERROR]",
+		DebugLevel: "[DEBUG]",
+		TraceLevel: "[TRACE]",
+		InfoLevel:  "[INFO] ",
+		WarnLevel:  "[WARN] ",
+		ErrorLevel: "[ERROR]",
 	}
 
 	_levelToColor = map[Level]*color.Color{
-		Debug: color.New(color.FgHiWhite),
-		Trace: color.New(color.FgHiGreen),
-		Info:  color.New(color.FgHiBlue),
-		Warn:  color.New(color.FgHiYellow),
-		Error: color.New(color.FgHiRed),
+		DebugLevel: color.New(color.FgHiWhite),
+		TraceLevel: color.New(color.FgHiGreen),
+		InfoLevel:  color.New(color.FgHiBlue),
+		WarnLevel:  color.New(color.FgHiYellow),
+		ErrorLevel: color.New(color.FgHiRed),
 	}
 )
 
@@ -447,15 +447,15 @@ func (l newLogger) jsonMapEntry(t time.Time, name string, level Level, msg strin
 
 	var levelStr string
 	switch level {
-	case Error:
+	case ErrorLevel:
 		levelStr = "error"
-	case Warn:
+	case WarnLevel:
 		levelStr = "warn"
-	case Info:
+	case InfoLevel:
 		levelStr = "info"
-	case Debug:
+	case DebugLevel:
 		levelStr = "debug"
-	case Trace:
+	case TraceLevel:
 		levelStr = "trace"
 	default:
 		levelStr = "all"
@@ -480,60 +480,60 @@ func (l *newLogger) Log(level Level, msg string, args ...interface{}) {
 }
 
 func (l *newLogger) Debug(msg string, args ...interface{}) {
-	l.log(l.Name(), Debug, msg, args...)
+	l.log(l.Name(), DebugLevel, msg, args...)
 }
 
 func (l *newLogger) Trace(msg string, args ...interface{}) {
-	l.log(l.Name(), Trace, msg, args...)
+	l.log(l.Name(), TraceLevel, msg, args...)
 }
 
 func (l *newLogger) Info(msg string, args ...interface{}) {
-	l.log(l.Name(), Info, msg, args...)
+	l.log(l.Name(), InfoLevel, msg, args...)
 }
 
 func (l *newLogger) Warn(msg string, args ...interface{}) {
-	l.log(l.Name(), Warn, msg, args...)
+	l.log(l.Name(), WarnLevel, msg, args...)
 }
 
 func (l *newLogger) Error(msg string, args ...interface{}) {
-	l.log(l.Name(), Error, msg, args...)
+	l.log(l.Name(), ErrorLevel, msg, args...)
 }
 
 func (l *newLogger) LogError(msg string, args ...interface{}) error {
-	l.log(l.Name(), Error, msg, args...)
+	l.log(l.Name(), ErrorLevel, msg, args...)
 	return fmt.Errorf(msg)
 }
 
 func (l *newLogger) Panic(msg string, args ...interface{}) {
-	l.log(l.Name(), Error, msg, args...)
+	l.log(l.Name(), ErrorLevel, msg, args...)
 	panic(msg)
 }
 
 func (l *newLogger) ErrorPanic(err error, args ...interface{}) {
 	if err != nil {
-		l.log(l.Name(), Error, err.Error(), args...)
+		l.log(l.Name(), ErrorLevel, err.Error(), args...)
 		panic(err)
 	}
 }
 
 func (l *newLogger) IsTrace() bool {
-	return Level(atomic.LoadInt32(l.level)) == Trace
+	return Level(atomic.LoadInt32(l.level)) == TraceLevel
 }
 
 func (l *newLogger) IsDebug() bool {
-	return Level(atomic.LoadInt32(l.level)) <= Debug
+	return Level(atomic.LoadInt32(l.level)) <= DebugLevel
 }
 
 func (l *newLogger) IsInfo() bool {
-	return Level(atomic.LoadInt32(l.level)) <= Info
+	return Level(atomic.LoadInt32(l.level)) <= InfoLevel
 }
 
 func (l *newLogger) IsWarn() bool {
-	return Level(atomic.LoadInt32(l.level)) <= Warn
+	return Level(atomic.LoadInt32(l.level)) <= WarnLevel
 }
 
 func (l *newLogger) IsError() bool {
-	return Level(atomic.LoadInt32(l.level)) <= Error
+	return Level(atomic.LoadInt32(l.level)) <= ErrorLevel
 }
 
 func (l *newLogger) Close() {

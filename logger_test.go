@@ -15,7 +15,7 @@ func TestLogger(t *testing.T) {
 		panic(err)
 	}
 	l := New(&LoggerOptions{
-		Level:  Debug,
+		Level:  DebugLevel,
 		Color:  []ColorOption{AutoColor, ColorOff},
 		Output: []io.Writer{DefaultOutput, fp},
 	})
@@ -25,7 +25,7 @@ func TestLogger(t *testing.T) {
 
 func TestDefaultLog(t *testing.T) {
 
-	l := NewDefaultLog(nil, "test", Debug, "./", 1)
+	l := NewDefaultLog(nil, "test", DebugLevel, "./", 1)
 	for {
 		l.Info("Test message")
 		time.Sleep(1 * time.Minute)

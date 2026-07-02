@@ -38,7 +38,7 @@ func NewLog() {
 	if initDone {
 		return
 	}
-	log = NewDefaultLog(context.Background(), "logger", Info, "./logs/", 10)
+	log = NewDefaultLog(context.Background(), "logger", InfoLevel, "./logs/", 10)
 	initDone = true
 }
 
@@ -106,18 +106,18 @@ func (e *Entry) logFunc(level Level, msg string, args ...interface{}) {
 		if e.err == nil {
 			return
 		}
-		level = Error
+		level = ErrorLevel
 	}
 	switch level {
-	case Trace:
+	case TraceLevel:
 		log.Trace(msg, args...)
-	case Debug:
+	case DebugLevel:
 		log.Debug(msg, args...)
-	case Info:
+	case InfoLevel:
 		log.Info(msg, args...)
-	case Warn:
+	case WarnLevel:
 		log.Warn(msg, args...)
-	case Error:
+	case ErrorLevel:
 		log.Error(msg, args...)
 	}
 }
@@ -138,27 +138,27 @@ func (e *Entry) expandFields(args ...interface{}) []interface{} {
 }
 
 func (e *Entry) Trace(msg string, args ...interface{}) {
-	e.logFunc(Trace, msg, e.expandFields(args...)...)
+	e.logFunc(TraceLevel, msg, e.expandFields(args...)...)
 }
 
 func (e *Entry) Debug(msg string, args ...interface{}) {
-	e.logFunc(Debug, msg, e.expandFields(args...)...)
+	e.logFunc(DebugLevel, msg, e.expandFields(args...)...)
 }
 
 func (e *Entry) Info(msg string, args ...interface{}) {
-	e.logFunc(Info, msg, e.expandFields(args...)...)
+	e.logFunc(InfoLevel, msg, e.expandFields(args...)...)
 }
 
 func (e *Entry) Warn(msg string, args ...interface{}) {
-	e.logFunc(Warn, msg, e.expandFields(args...)...)
+	e.logFunc(WarnLevel, msg, e.expandFields(args...)...)
 }
 
 func (e *Entry) Error(msg string, args ...interface{}) {
-	e.logFunc(Error, msg, e.expandFields(args...)...)
+	e.logFunc(ErrorLevel, msg, e.expandFields(args...)...)
 }
 
 func (e *Entry) Panic(msg string, args ...interface{}) {
-	e.logFunc(Error, msg, e.expandFields(args...)...)
+	e.logFunc(ErrorLevel, msg, e.expandFields(args...)...)
 	if e.isOnError {
 		if e.err == nil {
 			return
@@ -168,11 +168,35 @@ func (e *Entry) Panic(msg string, args ...interface{}) {
 }
 
 func (e *Entry) Fatal(msg string, args ...interface{}) {
-	e.logFunc(Error, msg, e.expandFields(args...)...)
+	e.logFunc(ErrorLevel, msg, e.expandFields(args...)...)
 	if e.isOnError {
 		if e.err == nil {
 			return
 		}
 	}
 	panic(msg)
+}
+
+func Trace(msg string, args ...interface{}) {
+	NewEntry().Trace(msg, args...)
+}
+
+func Debug(msg string, args ...interface{}) {
+	NewEntry().Debug(msg, args...)
+}
+
+func Info(msg string, args ...interface{}) {
+	NewEntry().Info(msg, args...)
+}
+
+func Warn(msg string, args ...interface{}) {
+	NewEntry().Warn(msg, args...)
+}
+
+func Error(msg string, args ...interface{}) {
+	NewEntry().Error(msg, args...)
+}
+
+func Panic(msg string, args ...interface{}) {
+	NewEntry().Panic(msg, args...)
 }
