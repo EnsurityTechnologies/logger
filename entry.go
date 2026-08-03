@@ -42,6 +42,13 @@ func NewLog() {
 	initDone = true
 }
 
+func GetLogger() Logger {
+	if !initDone {
+		NewLog()
+	}
+	return log
+}
+
 func NewEntry() *Entry {
 	NewLog()
 	return &Entry{}
